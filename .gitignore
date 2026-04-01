@@ -1,0 +1,14 @@
+node_modules/
+dist/
+
+__pycache__/
+*.pyc
+.venv/
+
+.env
+.env.*
+
+*.joblib
+*.pkl
+
+.DS_Store
