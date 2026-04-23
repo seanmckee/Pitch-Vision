@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pybaseball import statcast_pitcher
 import pandas as pd
+from pybaseball import playerid_lookup
 
 
 app = FastAPI()
@@ -30,3 +31,15 @@ def get_pitches(pitcher_id: int, start: str, end: str):
     data = data.fillna(0)  # replace remaining NaNs with 0
     
     return data.to_dict(orient='records')
+
+
+@app.get("/players/search")
+def search_players(name: str):
+    parts = name.strip().split()
+    last = parts[-1]
+    first = parts[0] if len(parts) > 1 else ''
+    
+    results = playerid_lookup(last, first)
+    return results[['name_first', 'name_last', 'key_mlbam']].to_dict(orient='records')
+
+

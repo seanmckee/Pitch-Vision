@@ -8,7 +8,7 @@ const items = [
 
 const PitchLegend = () => {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2 rounded-lg border border-white/15 p-4">
       {items.map(({ label, color }) => (
         <div key={label} className="flex items-center gap-2">
           <span
