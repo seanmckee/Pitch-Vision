@@ -16,7 +16,8 @@ Pitch Vision is a baseball pitch analytics web app. It visualizes Statcast pitch
 - `npx shadcn@latest add <component>` — add shadcn/ui components
 
 ### Backend (from `backend/`)
-- Not yet scaffolded. Will be FastAPI (Python).
+- `source venv/bin/activate` — activate the Python virtualenv
+- `uvicorn main:app --reload` — start FastAPI dev server on `http://localhost:8000` (matches the CORS allow-list and the URL hardcoded in `frontend/src/App.tsx`)
 
 ## Architecture
 
@@ -27,11 +28,15 @@ Pitch Vision is a baseball pitch analytics web app. It visualizes Statcast pitch
 - D3 visualizations render into `useRef<SVGSVGElement>` via `useEffect` — D3 owns the DOM inside the SVG, React owns everything outside. Clear previous render with `selectAll('*').remove()` before drawing.
 - Statcast coordinate system: `plate_x` is horizontal (-2.5 to 2.5 ft), `plate_z` is vertical (0 to 5 ft). Strike zone box is roughly x: ±0.83 ft, z: 1.5–3.5 ft.
 
-### Planned Backend
-- FastAPI with RESTful endpoints
-- pybaseball for Statcast data ingestion
-- XGBoost + scikit-learn models saved in `models/`
-- LangGraph agent for natural language pitch queries
+### Backend
+- FastAPI app in `backend/main.py`, CORS locked to `http://localhost:5173` (Vite dev origin)
+- Statcast data is fetched on-demand via `pybaseball` (`statcast_pitcher`, `playerid_lookup`) — there is no DB or cache, so endpoints can be slow on first hit
+- Endpoints currently shipped:
+  - `GET /players/search?name=<query>` — fuzzy lookup, returns `{name_first, name_last, key_mlbam}` rows
+  - `GET /pitches/{pitcher_id}?start=<YYYY-MM-DD>&end=<YYYY-MM-DD>` — trimmed pitch records (drops rows missing `plate_x`/`plate_z`, fills remaining NaNs with 0)
+  - `GET /games/{pitcher_id}` — last 365 days of pitches for the pitcher
+- Frontend → backend flow: search by name → take `players[0].key_mlbam` → fetch `/pitches/{id}` for a date range → render in `StrikeZone`
+- XGBoost + scikit-learn models will be saved in `models/` (empty for now); LangGraph NL query agent is planned but not built
 
 ## Conventions
 
