@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pybaseball import statcast_pitcher
 import pandas as pd
-from pybaseball import playerid_lookup
+from pybaseball import playerid_lookup, playerid_reverse_lookup
 from datetime import date, timedelta
 
 
@@ -25,12 +25,51 @@ def root():
 @app.get("/pitches/{pitcher_id}")
 def get_pitches(pitcher_id: int, start: str, end: str):
     data = statcast_pitcher(start, end, pitcher_id)
-    
-    cols = ['pitch_type', 'plate_x', 'plate_z', 'description', 
-            'release_speed', 'release_spin_rate', 'sz_top', 'sz_bot', 'game_pk', 'game_date', 'inning_topbot', 'inning', 'at_bat_number', 'pitch_number']
-    data = data[cols].dropna(subset=['plate_x', 'plate_z'])
+
+    cols = [
+        # identity / context
+        'pitch_type', 'pitch_name', 'description', 'type', 'events',
+        'game_pk', 'game_date', 'home_team', 'away_team',
+        'inning_topbot', 'inning', 'at_bat_number', 'pitch_number',
+        'batter', 'balls', 'strikes', 'outs_when_up',
+        'stand', 'p_throws', 'zone',
+        # location / strike zone
+        'plate_x', 'plate_z', 'sz_top', 'sz_bot',
+        # velocity / spin
+        'release_speed', 'effective_speed', 'release_spin_rate', 'spin_axis',
+        # release geometry
+        'release_pos_x', 'release_pos_z', 'release_extension',
+        # movement
+        'pfx_x', 'pfx_z',
+        # batted-ball outcome (only populated on contact)
+        'launch_speed', 'launch_angle', 'bb_type', 'hit_distance_sc',
+        'estimated_ba_using_speedangle', 'estimated_woba_using_speedangle',
+    ]
+    available = [c for c in cols if c in data.columns]
+    data = data[available].dropna(subset=['plate_x', 'plate_z'])
+
+    name_map: dict[int, str] = {}
+    batter_ids = [int(b) for b in data['batter'].dropna().unique().tolist()]
+    if batter_ids:
+        try:
+            lookup = playerid_reverse_lookup(batter_ids, key_type='mlbam')
+            for _, row in lookup.iterrows():
+                first = str(row.get('name_first', '') or '').strip()
+                last = str(row.get('name_last', '') or '').strip()
+                full = ' '.join(p for p in (first, last) if p).title()
+                name_map[int(row['key_mlbam'])] = full or str(int(row['key_mlbam']))
+        except Exception:
+            name_map = {}
+
+    def resolve_name(b):
+        if pd.isna(b):
+            return ''
+        bid = int(b)
+        return name_map.get(bid, str(bid))
+
+    data = data.assign(batter_name=data['batter'].map(resolve_name))
     data = data.fillna(0)  # replace remaining NaNs with 0
-    
+
     return data.to_dict(orient='records')
 
 
