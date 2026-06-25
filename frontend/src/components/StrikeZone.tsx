@@ -30,6 +30,7 @@ interface StrikeZoneProps {
   highlightPitch?: Pitch | null
 }
 
+// color map for pitch descriptions
 const colorMap: Record<string, string> = {
   called_strike: '#ef4444',
   ball: '#3b82f6',
@@ -38,8 +39,10 @@ const colorMap: Record<string, string> = {
   foul: '#a855f7',
 }
 
+// color for pitch based on description
 const colorFor = (d: Pitch) => colorMap[d.description] || '#94a3b8'
 
+// format description for tooltip
 const formatDescription = (d: string) =>
   d ? d.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : ''
 

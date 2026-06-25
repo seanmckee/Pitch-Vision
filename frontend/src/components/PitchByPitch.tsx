@@ -169,7 +169,7 @@ const PitchByPitch = ({
                 {abs.map((ab) => {
                   const isCurrent = ab.atBatNumber === current.at_bat_number
                   const startIdx = atBatStartIndex.get(ab.atBatNumber) ?? 0
-                  const lastName = ab.batterName.split(' ').slice(-1)[0] || `#${ab.batter}`
+                  const lastName = ab.batterName?.split(' ').slice(-1)[0] || `#${ab.batter}`
                   return (
                     <button
                       key={ab.atBatNumber}
