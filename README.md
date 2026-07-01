@@ -42,9 +42,26 @@ npm install
 npm run dev
 ```
 
-App runs at `http://localhost:5173`. The frontend expects the API on port 8000.
+App runs at `http://localhost:5173`. By default the frontend talks to `http://localhost:8000`.
+
+Optional: copy `frontend/.env.example` → `frontend/.env.local` if you need a custom API URL locally.
 
 Try searching something like `Shohei Ohtani` or `Gerrit Cole`.
+
+## Deploy
+
+**Backend (Render):** [pitch-vision.onrender.com](https://pitch-vision.onrender.com)
+
+**Frontend (Vercel):** connect the repo, set root directory to `frontend`.
+
+| Where | Variable | Value |
+|-------|----------|-------|
+| Vercel | `VITE_API_URL` | `https://pitch-vision.onrender.com` |
+| Render | `ALLOWED_ORIGINS` | `http://localhost:5173,https://YOUR-APP.vercel.app` |
+
+After Vercel gives you a URL, add it to `ALLOWED_ORIGINS` on Render and redeploy the backend.
+
+**Flow:** push to `main` → Vercel rebuilds frontend, Render rebuilds backend. Local dev unchanged (localhost defaults).
 
 ## Repo layout
 

@@ -11,7 +11,7 @@ import { Calendar } from './components/ui/calendar'
 import {Popover, PopoverContent, PopoverTrigger} from './components/ui/popover'
 import { sortPitches, groupByInning, groupByAtBat } from './lib/pitchGroups'
 
-const API = 'http://localhost:8000'
+const API = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
 interface Pitch {
   pitch_type: string
