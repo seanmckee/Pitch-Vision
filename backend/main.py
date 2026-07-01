@@ -1,9 +1,11 @@
+import gc
 import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pybaseball import statcast_pitcher, playerid_lookup, playerid_reverse_lookup
 from datetime import date, timedelta
+import pandas as pd
 
 DEFAULT_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
 ALLOWED_ORIGINS = [
@@ -11,6 +13,10 @@ ALLOWED_ORIGINS = [
     for origin in os.getenv("ALLOWED_ORIGINS", DEFAULT_ORIGINS).split(",")
     if origin.strip()
 ]
+
+# Render free tier has 512MB RAM — full-season statcast in one call can OOM
+GAMES_LOOKBACK_DAYS = int(os.getenv("GAMES_LOOKBACK_DAYS", "120"))
+GAMES_CHUNK_DAYS = int(os.getenv("GAMES_CHUNK_DAYS", "30"))
 
 # Matches frontend Pitch interface in App.tsx — only what the UI uses
 PITCH_COLS = [
@@ -75,10 +81,14 @@ def _fill_missing(data):
 @app.get("/pitches/{pitcher_id}")
 def get_pitches(pitcher_id: int, start: str, end: str):
     raw = statcast_pitcher(start, end, pitcher_id)
-    data = raw[PITCH_COLS].dropna(subset=['plate_x', 'plate_z'])
-    data = _attach_batter_names(data)
-    data = _fill_missing(data)
-    return data.to_dict(orient='records')
+    try:
+        data = raw[PITCH_COLS].dropna(subset=['plate_x', 'plate_z'])
+        data = _attach_batter_names(data)
+        data = _fill_missing(data)
+        return data.to_dict(orient='records')
+    finally:
+        del raw
+        gc.collect()
 
 
 @app.get("/players/search")
@@ -90,15 +100,38 @@ def search_players(name: str):
     first = parts[0] if len(parts) > 1 else ''
 
     results = playerid_lookup(last, first)
-    return results[['name_first', 'name_last', 'key_mlbam']].to_dict(orient='records')
+    out = results[['name_first', 'name_last', 'key_mlbam']].to_dict(orient='records')
+    gc.collect()
+    return out
 
 
 @app.get("/games/{pitcher_id}")
 def get_games(pitcher_id: int):
     today = date.today()
-    start = (today - timedelta(days=365)).isoformat()
-    end = today.isoformat()
-    games = statcast_pitcher(start, end, pitcher_id)[['game_date', 'game_pk']]
+    start_date = today - timedelta(days=GAMES_LOOKBACK_DAYS)
+    frames: list[pd.DataFrame] = []
+    cursor = start_date
+
+    while cursor <= today:
+        chunk_end = min(cursor + timedelta(days=GAMES_CHUNK_DAYS), today)
+        raw = statcast_pitcher(cursor.isoformat(), chunk_end.isoformat(), pitcher_id)
+        try:
+            if raw is not None and not raw.empty:
+                frames.append(raw[['game_date', 'game_pk']])
+        finally:
+            del raw
+
+        cursor = chunk_end + timedelta(days=1)
+
+    if not frames:
+        return []
+
+    games = pd.concat(frames, ignore_index=True)
+    del frames
     summary = games.groupby(['game_date', 'game_pk']).size().reset_index(name='pitch_count')
+    del games
     summary = summary.sort_values('game_date', ascending=False)
-    return summary.to_dict(orient='records')
+    out = summary.to_dict(orient='records')
+    del summary
+    gc.collect()
+    return out
