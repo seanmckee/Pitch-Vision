@@ -1,3 +1,5 @@
+import { panelClass } from './PageShell'
+
 const items = [
   { label: 'Called Strike', color: '#ef4444' }, // red
   { label: 'Swinging Strike', color: '#f97316' }, // orange
@@ -8,7 +10,7 @@ const items = [
 
 const PitchLegend = () => {
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-white/15 p-4">
+    <div className={`flex flex-col gap-2 p-4 ${panelClass}`}>
       {items.map(({ label, color }) => (
         <div key={label} className="flex items-center gap-2">
           <span

@@ -3,6 +3,8 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from './ui/button'
 import { groupByInning, groupByAtBat, type PitchLike } from '../lib/pitchGroups'
 
+import { panelClass } from './PageShell'
+
 interface Pitch extends PitchLike {
   pitch_type: string
   pitch_name: string
@@ -104,7 +106,7 @@ const PitchByPitch = ({
   const hitDist = current.hit_distance_sc ? `${Math.round(current.hit_distance_sc)} ft` : null
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-white/15 p-3">
+    <div className={`flex flex-col gap-3 p-3 ${panelClass}`}>
       <div className="flex flex-col gap-1 text-sm">
         <div className="font-semibold text-gray-100">
           {current.inning_topbot} {current.inning} — {current.batter_name || `Batter #${current.batter}`}
