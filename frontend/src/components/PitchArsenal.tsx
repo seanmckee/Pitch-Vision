@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
 
+import { panelClass } from './PageShell'
+
 interface Pitch {
   pitch_type: string
   pitch_name: string
@@ -60,7 +62,7 @@ const PitchArsenal = ({ pitches, title = 'Arsenal' }: PitchArsenalProps) => {
   const total = pitches.length
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-white/15 p-3 text-xs text-gray-200">
+    <div className={`flex flex-col gap-2 p-3 text-xs text-gray-200 ${panelClass}`}>
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-gray-100">{title}</span>
         <span className="text-gray-400">{total} pitches</span>
