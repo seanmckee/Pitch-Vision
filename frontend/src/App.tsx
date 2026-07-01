@@ -56,6 +56,14 @@ interface Pitch {
   estimated_woba_using_speedangle: number
 }
 
+type LoadingStage = null | 'player' | 'games' | 'pitches'
+
+const LOADING_LABELS: Record<Exclude<LoadingStage, null>, string> = {
+  player: 'Finding pitcher…',
+  games: 'Loading game dates…',
+  pitches: 'Loading pitches…',
+}
+
 interface Game {
   game_date: string
   game_pk: number
@@ -74,11 +82,12 @@ const VIEW_MODES: { id: ViewMode; label: string }[] = [
 function App() {
   const [pitches, setPitches] = useState<Pitch[]>([])
   const [pitcherName, setPitcherName] = useState<string>('')
-  const [isLoadingPitches, setIsLoadingPitches] = useState(false)
+  const [loadingStage, setLoadingStage] = useState<LoadingStage>(null)
   const [selectedPitcherId, setSelectedPitcherId] = useState<number | null>(null)
   const [gameDates, setGameDates] = useState<Map<string, number>>(new Map())
   const [selectedGameDate, setSelectedGameDate] = useState<Date | undefined>(undefined)
-  const [isLoadingGames, setIsLoadingGames] = useState(false)
+
+  const isBusy = loadingStage !== null
 
   const [viewMode, setViewMode] = useState<ViewMode>('game')
   const [selectedInningKey, setSelectedInningKey] = useState<string | null>(null)
@@ -98,7 +107,7 @@ function App() {
   }, [sortedPitches, inningGroups, atBatGroups])
 
   const fetchPitchesForDate = async (id: number, dateStr: string) => {
-    setIsLoadingPitches(true)
+    setLoadingStage('pitches')
     try {
       const res = await fetch(`${API}/pitches/${id}?start=${dateStr}&end=${dateStr}`)
       if (!res.ok) throw new Error('Pitches fetch failed')
@@ -107,20 +116,20 @@ function App() {
     } catch {
       setPitches([])
     } finally {
-      setIsLoadingPitches(false)
+      setLoadingStage(null)
     }
   }
 
   const handleSearch = async () => {
     const name = pitcherName.trim()
-    if (!name || isLoadingGames || isLoadingPitches) return
+    if (!name || isBusy) return
 
-    setIsLoadingGames(true)
     setPitches([])
     setGameDates(new Map())
     setSelectedGameDate(undefined)
     setSelectedPitcherId(null)
-
+    setLoadingStage('player')
+    let pitchFetchStarted = false
     try {
       const searchRes = await fetch(
         `${API}/players/search?name=${encodeURIComponent(name)}`
@@ -132,6 +141,7 @@ function App() {
 
       setSelectedPitcherId(id)
 
+      setLoadingStage('games')
       const gamesRes = await fetch(`${API}/games/${id}`)
       if (!gamesRes.ok) throw new Error('Games fetch failed')
       const games: Game[] = await gamesRes.json()
@@ -143,12 +153,13 @@ function App() {
       if (games.length > 0) {
         const mostRecent = games[0].game_date
         setSelectedGameDate(parseISO(mostRecent))
+        pitchFetchStarted = true
         await fetchPitchesForDate(id, mostRecent)
       }
     } catch {
       setPitches([])
     } finally {
-      setIsLoadingGames(false)
+      if (!pitchFetchStarted) setLoadingStage(null)
     }
   }
 
@@ -164,13 +175,11 @@ function App() {
     return first ? parseISO(first) : undefined
   }, [gameDates, selectedGameDate])
 
-  const triggerLabel = isLoadingGames
-    ? 'Loading games…'
-    : selectedGameDate
-      ? format(selectedGameDate, 'MMM d, yyyy')
-      : 'Select Date'
+  const triggerLabel = selectedGameDate
+    ? format(selectedGameDate, 'MMM d, yyyy')
+    : 'Select Date'
 
-  const triggerDisabled = isLoadingGames || selectedPitcherId == null
+  const triggerDisabled = loadingStage === 'games' || selectedPitcherId == null
 
   const currentInning = inningGroups.find((g) => g.key === selectedInningKey) ?? null
   const currentAtBat = atBatGroups.find((g) => g.atBatNumber === selectedAtBat) ?? null
@@ -222,20 +231,18 @@ function App() {
                 value={pitcherName}
                 onChange={handlePitcherNameChange}
                 placeholder="Search for a pitcher"
-                className="min-w-0 flex-1 border-white/20 bg-transparent"
+                className="min-w-0 flex-1 border-white/20 bg-transparent "
               />
               <Button
                 variant="default"
                 type="button"
                 onClick={handleSearch}
-                disabled={isLoadingGames || isLoadingPitches || !pitcherName.trim()}
-                aria-busy={isLoadingGames || isLoadingPitches}
+                disabled={isBusy || !pitcherName.trim()}
+                aria-busy={isBusy}
+                aria-label={isBusy ? 'Searching' : 'Search'}
               >
-                {isLoadingGames || isLoadingPitches ? (
-                  <>
-                    <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
-                    Loading
-                  </>
+                {isBusy ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
                 ) : (
                   'Search'
                 )}
@@ -324,14 +331,17 @@ function App() {
 
             <div className="relative rounded-lg border border-white/15 p-2">
               <StrikeZone {...zoneProps} />
-              {isLoadingPitches ? (
+              {loadingStage ? (
                 <div
                   className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-[inherit] bg-gray-950/65 backdrop-blur-[2px]"
                   role="status"
                   aria-live="polite"
                 >
                   <Loader2 className="size-10 animate-spin text-white/85" aria-hidden />
-                  <span className="text-sm text-white/75">Loading pitches…</span>
+                  <span className="text-sm text-white/75">{LOADING_LABELS[loadingStage]}</span>
+                  {loadingStage === 'games' && (
+                    <span className="text-xs text-white/50">May take a minute</span>
+                  )}
                 </div>
               ) : null}
             </div>
